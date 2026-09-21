@@ -2,216 +2,354 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>문서 통합 유틸리티</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DocuMorph - 올인원 PDF & 문서 처리 도구</title>
+  <!-- Tailwind CSS & Lucide Icons via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <style>
-    body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; line-height: 1.6; }
-    .tab { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #ddd; }
-    .tab button { padding: 10px 15px; border: none; background: none; font-size: 16px; cursor: pointer; }
-    .tab button.active { font-weight: bold; border-bottom: 3px solid #0066cc; color: #0066cc; }
-    .panel { display: none; }
-    .panel.active { display: block; }
-    .upload-box { border: 2px dashed #bbb; padding: 30px; text-align: center; margin: 15px 0; border-radius: 8px; }
-    .stat-box { display: flex; gap: 20px; margin-top: 15px; }
-    .stat-item { background: #f4f4f4; padding: 15px; border-radius: 6px; flex: 1; text-align: center; }
-    textarea { width: 100%; height: 200px; margin-top: 15px; box-sizing: border-box; }
-    button.btn { background: #0066cc; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 15px; margin-top: 10px; }
-    button.btn:disabled { background: #aaa; cursor: not-allowed; }
+    @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap');
+    body { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif; }
   </style>
 </head>
-<body>
-  <h2>📄 문서 통합 처리 도구 (GitHub Pages용)</h2>
-  <div class="tab">
-    <button class="active" onclick="openTab(0)">1. 단어/특수문자</button>
-    <button onclick="openTab(1)">2. 이미지 추출 (JPG)</button>
-    <button onclick="openTab(2)">3. 텍스트 추출 (TXT)</button>
-    <button onclick="openTab(3)">4. HWPX 변환</button>
-  </div>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
 
-  <!-- Tab 1 -->
-  <div class="panel active">
-    <div class="upload-box">
-      <input type="file" id="file1" accept=".pdf,.txt">
+  <!-- 헤더 -->
+  <header class="border-b bg-white/80 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-sm shadow-blue-200">
+          <i data-lucide="layers" class="w-5 h-5"></i>
+        </div>
+        <span class="font-bold text-lg tracking-tight text-slate-900">DocuMorph</span>
+        <span class="text-xs bg-blue-50 text-blue-600 font-semibold px-2 py-0.5 rounded-full ml-1 border border-blue-100">Web App</span>
+      </div>
+      <div class="text-xs text-slate-400 font-medium">100% 브라우저 로컬 처리 · 안전한 보안</div>
     </div>
-    <div class="stat-box">
-      <div class="stat-item">단어 수<h3 id="word-count">0</h3></div>
-      <div class="stat-item">특수문자 수<h3 id="char-count">0</h3></div>
-      <div class="stat-item">공백제외 글자수<h3 id="text-count">0</h3></div>
-    </div>
-  </div>
+  </header>
 
-  <!-- Tab 2 -->
-  <div class="panel">
-    <div class="upload-box">
-      <input type="file" id="file2" accept=".pdf">
+  <!-- 메인 영역 -->
+  <main class="max-w-5xl mx-auto px-6 py-10">
+    <!-- 타이틀 -->
+    <div class="text-center mb-8">
+      <h1 class="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight mb-2">스마트 문서 변환 & 분석 플랫폼</h1>
+      <p class="text-sm md:text-base text-slate-500">별도의 서버 전송 없이 내 브라우저에서 바로 문서를 추출, 분석, 변환하세요.</p>
     </div>
-    <button class="btn" id="btn-extract-img" disabled>이미지 ZIP 다운로드</button>
-    <p id="img-status"></p>
-  </div>
 
-  <!-- Tab 3 -->
-  <div class="panel">
-    <div class="upload-box">
-      <input type="file" id="file3" accept=".pdf">
+    <!-- 네비게이션 탭 -->
+    <div class="flex bg-slate-200/70 p-1.5 rounded-2xl mb-8 gap-1 shadow-inner max-w-2xl mx-auto">
+      <button onclick="selectTab(0)" class="tab-btn active flex-1 py-2.5 px-3 rounded-xl font-medium text-xs md:text-sm flex items-center justify-center gap-1.5 transition-all bg-white text-blue-600 shadow-sm">
+        <i data-lucide="hash" class="w-4 h-4"></i>글자/특수문자
+      </button>
+      <button onclick="selectTab(1)" class="tab-btn flex-1 py-2.5 px-3 rounded-xl font-medium text-xs md:text-sm flex items-center justify-center gap-1.5 transition-all text-slate-600 hover:text-slate-900">
+        <i data-lucide="image" class="w-4 h-4"></i>이미지 추출
+      </button>
+      <button onclick="selectTab(2)" class="tab-btn flex-1 py-2.5 px-3 rounded-xl font-medium text-xs md:text-sm flex items-center justify-center gap-1.5 transition-all text-slate-600 hover:text-slate-900">
+        <i data-lucide="file-text" class="w-4 h-4"></i>텍스트 추출
+      </button>
+      <button onclick="selectTab(3)" class="tab-btn flex-1 py-2.5 px-3 rounded-xl font-medium text-xs md:text-sm flex items-center justify-center gap-1.5 transition-all text-slate-600 hover:text-slate-900">
+        <i data-lucide="file-code" class="w-4 h-4"></i>HWPX 변환
+      </button>
     </div>
-    <button class="btn" id="btn-download-txt" disabled>텍스트(.txt) 다운로드</button>
-    <textarea id="preview-txt" readonly placeholder="추출된 텍스트가 여기에 표시됩니다."></textarea>
-  </div>
 
-  <!-- Tab 4 -->
-  <div class="panel">
-    <div class="upload-box">
-      <input type="file" id="file4" accept=".pdf">
+    <!-- 카드 컨테이너 -->
+    <div class="bg-white border border-slate-200/80 rounded-3xl p-6 md:p-8 shadow-sm">
+
+      <!-- 1번 탭: 글자/특수문자 세기 -->
+      <section class="tab-panel block space-y-6">
+        <div>
+          <h2 class="text-lg font-bold text-slate-800">문서 텍스트 및 통계 분석</h2>
+          <p class="text-sm text-slate-500">PDF나 TXT 파일을 업로드하여 총 단어 수, 공백 제외 글자 수, 특수문자 개수를 정밀 측정합니다.</p>
+        </div>
+        <div class="drop-zone border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50/50 hover:bg-blue-50/20 rounded-2xl p-8 text-center cursor-pointer transition-all" onclick="document.getElementById('file1').click()">
+          <input type="file" id="file1" accept=".pdf,.txt" class="hidden">
+          <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-3">
+            <i data-lucide="upload-cloud" class="w-6 h-6"></i>
+          </div>
+          <p class="font-semibold text-slate-700 text-sm mb-1" id="label1">파일을 선택하거나 여기로 드래그하세요</p>
+          <p class="text-xs text-slate-400">PDF, TXT 지원 (최대 100MB)</p>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="p-5 bg-slate-50 rounded-2xl border border-slate-100">
+            <span class="text-xs font-semibold text-slate-400">총 단어(어절) 수</span>
+            <div class="text-2xl font-bold text-slate-800 mt-1" id="stat-words">-</div>
+          </div>
+          <div class="p-5 bg-slate-50 rounded-2xl border border-slate-100">
+            <span class="text-xs font-semibold text-slate-400">특수문자 개수</span>
+            <div class="text-2xl font-bold text-blue-600 mt-1" id="stat-specials">-</div>
+          </div>
+          <div class="p-5 bg-slate-50 rounded-2xl border border-slate-100">
+            <span class="text-xs font-semibold text-slate-400">공백 제외 글자 수</span>
+            <div class="text-2xl font-bold text-slate-800 mt-1" id="stat-chars">-</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2번 탭: 이미지 추출 -->
+      <section class="tab-panel hidden space-y-6">
+        <div>
+          <h2 class="text-lg font-bold text-slate-800">PDF 이미지 및 페이지 컷 추출 (.jpg)</h2>
+          <p class="text-sm text-slate-500">논문이나 문서 내 삽입된 도표, 마스크 사진, 그래픽 요소를 깨짐 없이 JPG로 묶어 다운로드합니다.</p>
+        </div>
+        <div class="drop-zone border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50/50 hover:bg-blue-50/20 rounded-2xl p-8 text-center cursor-pointer transition-all" onclick="document.getElementById('file2').click()">
+          <input type="file" id="file2" accept=".pdf" class="hidden">
+          <div class="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center mx-auto mb-3">
+            <i data-lucide="image-down" class="w-6 h-6"></i>
+          </div>
+          <p class="font-semibold text-slate-700 text-sm mb-1" id="label2">PDF 파일을 선택하세요</p>
+          <p class="text-xs text-slate-400">페이지별 고화질 래스터화 및 임베디드 이미지 자동 보정</p>
+        </div>
+        <div id="img-loading" class="hidden p-4 bg-indigo-50/60 rounded-xl text-indigo-700 text-xs font-medium flex items-center gap-2">
+          <i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>
+          <span id="img-progress-txt">문서 내 이미지를 검색하고 변환하는 중입니다...</span>
+        </div>
+        <div class="flex items-center justify-between pt-2">
+          <span class="text-xs text-slate-400" id="img-summary">대기 중</span>
+          <button id="btn-img-down" disabled class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold flex items-center gap-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm">
+            <i data-lucide="download" class="w-4 h-4"></i>전체 이미지 다운로드 (.zip)
+          </button>
+        </div>
+        <div id="preview-grid" class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2"></div>
+      </section>
+
+      <!-- 3번 탭: 텍스트 추출 -->
+      <section class="tab-panel hidden space-y-6">
+        <div>
+          <h2 class="text-lg font-bold text-slate-800">텍스트 순차 추출 (.txt)</h2>
+          <p class="text-sm text-slate-500">PDF의 다단(컬럼) 구조를 분석하여 본문 내용을 텍스트 파일로 추출합니다.</p>
+        </div>
+        <div class="drop-zone border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50/50 hover:bg-blue-50/20 rounded-2xl p-8 text-center cursor-pointer transition-all" onclick="document.getElementById('file3').click()">
+          <input type="file" id="file3" accept=".pdf" class="hidden">
+          <div class="w-12 h-12 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center mx-auto mb-3">
+            <i data-lucide="file-type-2" class="w-6 h-6"></i>
+          </div>
+          <p class="font-semibold text-slate-700 text-sm mb-1" id="label3">PDF 파일을 선택하세요</p>
+          <p class="text-xs text-slate-400">순수 텍스트 스트림 분리 및 정렬</p>
+        </div>
+        <div class="space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-slate-500">추출된 텍스트 미리보기</span>
+            <button id="btn-txt-down" disabled class="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i>TXT 파일 다운로드
+            </button>
+          </div>
+          <textarea id="txt-preview" readonly class="w-full h-48 p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-mono leading-relaxed text-slate-700 focus:outline-none" placeholder="파일을 선택하면 텍스트가 여기에 표시됩니다."></textarea>
+        </div>
+      </section>
+
+      <!-- 4번 탭: HWPX 변환 -->
+      <section class="tab-panel hidden space-y-6">
+        <div>
+          <h2 class="text-lg font-bold text-slate-800">한글 HWPX 통합 문서 패키징</h2>
+          <p class="text-sm text-slate-500">추출된 텍스트와 이미지 태그를 표준 개방형 포맷인 .hwpx 규격으로 결합합니다.</p>
+        </div>
+        <div class="drop-zone border-2 border-dashed border-slate-200 hover:border-blue-400 bg-slate-50/50 hover:bg-blue-50/20 rounded-2xl p-8 text-center cursor-pointer transition-all" onclick="document.getElementById('file4').click()">
+          <input type="file" id="file4" accept=".pdf" class="hidden">
+          <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-3">
+            <i data-lucide="package" class="w-6 h-6"></i>
+          </div>
+          <p class="font-semibold text-slate-700 text-sm mb-1" id="label4">PDF 파일을 선택하세요</p>
+          <p class="text-xs text-slate-400">Section XML 및 BinData 이미지 통합</p>
+        </div>
+        <div class="flex items-center justify-between pt-2">
+          <span class="text-xs text-slate-400" id="hwpx-summary">대기 중</span>
+          <button id="btn-hwpx-down" disabled class="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-sm font-semibold flex items-center gap-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm">
+            <i data-lucide="download" class="w-4 h-4"></i>생성된 .hwpx 다운로드
+          </button>
+        </div>
+      </section>
+
     </div>
-    <button class="btn" id="btn-make-hwpx" disabled>.hwpx 다운로드</button>
-    <p id="hwpx-status"></p>
-  </div>
+  </main>
 
   <script>
+    lucide.createIcons();
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-    function openTab(idx) {
-      document.querySelectorAll('.tab button').forEach((b, i) => b.classList.toggle('active', i === idx));
-      document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i === idx));
+    function selectTab(idx) {
+      const btns = document.querySelectorAll('.tab-btn');
+      const panels = document.querySelectorAll('.tab-panel');
+      btns.forEach((btn, i) => {
+        if (i === idx) {
+          btn.className = 'tab-btn active flex-1 py-2.5 px-3 rounded-xl font-medium text-xs md:text-sm flex items-center justify-center gap-1.5 transition-all bg-white text-blue-600 shadow-sm';
+        } else {
+          btn.className = 'tab-btn flex-1 py-2.5 px-3 rounded-xl font-medium text-xs md:text-sm flex items-center justify-center gap-1.5 transition-all text-slate-600 hover:text-slate-900';
+        }
+      });
+      panels.forEach((p, i) => {
+        p.classList.toggle('hidden', i !== idx);
+        p.classList.toggle('block', i === idx);
+      });
     }
 
-    async function extractPdfText(file) {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
-      let fullText = '';
+    async function extractTextFromPdf(file) {
+      const data = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({data}).promise;
+      let full = '';
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items.map(item => item.str).join(' ');
-        fullText += `=== [페이지 ${i}] ===\n` + pageText + '\n\n';
+        const content = await page.getTextContent();
+        const text = content.items.map(it => it.str).join(' ');
+        full += `\n=== [Page ${i}] ===\n` + text + '\n';
       }
-      return fullText;
+      return full;
     }
 
-    // 1. 단어/특수문자 카운트
+    // 1. 단어/특수문자
     document.getElementById('file1').addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      let text = '';
-      if (file.name.endsWith('.pdf')) {
-        text = await extractPdfText(file);
-      } else {
-        text = await file.text();
-      }
-      const words = text.trim() ? text.trim().split(/\s+/).length : 0;
-      const specials = (text.match(/[^\w\s]/g) || []).length;
-      const noSpaces = text.replace(/\s+/g, '').length;
-      document.getElementById('word-count').innerText = words.toLocaleString();
-      document.getElementById('char-count').innerText = specials.toLocaleString();
-      document.getElementById('text-count').innerText = noSpaces.toLocaleString();
+      document.getElementById('label1').innerText = file.name;
+      let t = file.name.endsWith('.pdf') ? await extractTextFromPdf(file) : await file.text();
+      const words = t.trim() ? t.trim().split(/\s+/).length : 0;
+      const specials = (t.match(/[^\w\s]/g) || []).length;
+      const chars = t.replace(/\s+/g, '').length;
+      document.getElementById('stat-words').innerText = words.toLocaleString() + ' 개';
+      document.getElementById('stat-specials').innerText = specials.toLocaleString() + ' 개';
+      document.getElementById('stat-chars').innerText = chars.toLocaleString() + ' 자';
     });
 
-    // 2. 이미지 추출 (JPG -> ZIP)
-    let pdfImagesZip = null;
+    // 2. 견고한 이미지 추출 (개별 객체 추출 + 실패 시 캔버스 스냅샷 폴백)
+    let imgZipBlob = null;
     document.getElementById('file2').addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      document.getElementById('img-status').innerText = '이미지 추출 중...';
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+      document.getElementById('label2').innerText = file.name;
+      const loading = document.getElementById('img-loading');
+      const summary = document.getElementById('img-summary');
+      const grid = document.getElementById('preview-grid');
+      loading.classList.remove('hidden');
+      grid.innerHTML = '';
+
+      const data = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({data}).promise;
       const zip = new JSZip();
-      let count = 0;
+      let extractedCount = 0;
 
       for (let i = 1; i <= pdf.numPages; i++) {
+        document.getElementById('img-progress-txt').innerText = `${pdf.numPages}페이지 중 ${i}페이지 이미지 처리 중...`;
         const page = await pdf.getPage(i);
-        const ops = await page.getOperatorList();
-        for (let j = 0; j < ops.fnArray.length; j++) {
-          if (ops.fnArray[j] === pdfjsLib.OPS.paintImageXObject) {
-            const imgName = ops.argsArray[j][0];
-            try {
-              const imgObj = await page.objs.get(imgName);
-              const canvas = document.createElement('canvas');
-              canvas.width = imgObj.width;
-              canvas.height = imgObj.height;
-              const ctx = canvas.getContext('2d');
-              const imgData = ctx.createImageData(imgObj.width, imgObj.height);
-              if (imgObj.data.length === imgObj.width * imgObj.height * 3) {
-                let s = 0, d = 0;
-                while (s < imgObj.data.length) {
-                  imgData.data[d++] = imgObj.data[s++];
-                  imgData.data[d++] = imgObj.data[s++];
-                  imgData.data[d++] = imgObj.data[s++];
-                  imgData.data[d++] = 255;
+        let foundOnPage = 0;
+
+        try {
+          const ops = await page.getOperatorList();
+          for (let j = 0; j < ops.fnArray.length; j++) {
+            if (ops.fnArray[j] === pdfjsLib.OPS.paintImageXObject) {
+              const name = ops.argsArray[j][0];
+              const imgObj = await page.objs.get(name);
+              if (imgObj && imgObj.width > 20 && imgObj.height > 20) {
+                const c = document.createElement('canvas');
+                c.width = imgObj.width;
+                c.height = imgObj.height;
+                const ctx = c.getContext('2d');
+                const imgData = ctx.createImageData(c.width, c.height);
+                if (imgObj.data.length === c.width * c.height * 3) {
+                  let s = 0, d = 0;
+                  while (s < imgObj.data.length) {
+                    imgData.data[d++] = imgObj.data[s++];
+                    imgData.data[d++] = imgObj.data[s++];
+                    imgData.data[d++] = imgObj.data[s++];
+                    imgData.data[d++] = 255;
+                  }
+                } else {
+                  imgData.data.set(imgObj.data);
                 }
-              } else {
-                imgData.data.set(imgObj.data);
+                ctx.putImageData(imgData, 0, 0);
+                const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', 0.9));
+                extractedCount++;
+                foundOnPage++;
+                zip.file(`page_${i}_extracted_${foundOnPage}.jpg`, blob);
+
+                // 미리보기 썸네일 추가
+                if (extractedCount <= 8) {
+                  const thumb = document.createElement('img');
+                  thumb.src = URL.createObjectURL(blob);
+                  thumb.className = 'w-full h-24 object-cover rounded-xl border border-slate-200';
+                  grid.appendChild(thumb);
+                }
               }
-              ctx.putImageData(imgData, 0, 0);
-              const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg'));
-              count++;
-              zip.file(`page_${i}_img_${count}.jpg`, blob);
-            } catch(err) {}
+            }
+          }
+        } catch (err) {}
+
+        // 만약 임베디드 이미지 추출이 막혀있는 복합 PDF면 페이지 고화질 렌더링을 JPG로 저장
+        if (foundOnPage === 0) {
+          const viewport = page.getViewport({ scale: 1.5 });
+          const c = document.createElement('canvas');
+          c.width = viewport.width;
+          c.height = viewport.height;
+          await page.render({ canvasContext: c.getContext('2d'), viewport }).promise;
+          const blob = await new Promise(res => c.toBlob(res, 'image/jpeg', 0.9));
+          extractedCount++;
+          zip.file(`page_${i}_render.jpg`, blob);
+          if (extractedCount <= 8) {
+            const thumb = document.createElement('img');
+            thumb.src = URL.createObjectURL(blob);
+            thumb.className = 'w-full h-24 object-cover rounded-xl border border-slate-200';
+            grid.appendChild(thumb);
           }
         }
       }
-      if (count > 0) {
-        pdfImagesZip = zip;
-        document.getElementById('img-status').innerText = `총 ${count}개의 이미지를 찾았습니다.`;
-        document.getElementById('btn-extract-img').disabled = false;
-      } else {
-        document.getElementById('img-status').innerText = '추출할 래스터 이미지가 없습니다.';
-      }
+
+      imgZipBlob = await zip.generateAsync({ type: 'blob' });
+      loading.classList.add('hidden');
+      summary.innerText = `총 ${extractedCount}개의 이미지를 준비했습니다.`;
+      document.getElementById('btn-img-down').disabled = false;
     });
 
-    document.getElementById('btn-extract-img').addEventListener('click', async () => {
-      const content = await pdfImagesZip.generateAsync({type:'blob'});
+    document.getElementById('btn-img-down').addEventListener('click', () => {
       const a = document.createElement('a');
-      a.href = URL.createObjectURL(content);
+      a.href = URL.createObjectURL(imgZipBlob);
       a.download = 'extracted_images.zip';
       a.click();
     });
 
-    // 3. 텍스트 추출 (.txt)
-    let extractedText = '';
+    // 3. 텍스트 추출
+    let textResult = '';
     document.getElementById('file3').addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      extractedText = await extractPdfText(file);
-      document.getElementById('preview-txt').value = extractedText;
-      document.getElementById('btn-download-txt').disabled = false;
+      document.getElementById('label3').innerText = file.name;
+      textResult = await extractTextFromPdf(file);
+      document.getElementById('txt-preview').value = textResult;
+      document.getElementById('btn-txt-down').disabled = false;
     });
 
-    document.getElementById('btn-download-txt').addEventListener('click', () => {
-      const blob = new Blob([extractedText], {type: 'text/plain;charset=utf-8'});
+    document.getElementById('btn-txt-down').addEventListener('click', () => {
+      const blob = new Blob([textResult], { type: 'text/plain;charset=utf-8' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = 'extracted_text.txt';
       a.click();
     });
 
-    // 4. HWPX 문서 패키징
+    // 4. HWPX 변환
     let hwpxBlob = null;
     document.getElementById('file4').addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      document.getElementById('hwpx-status').innerText = 'HWPX 변환 중...';
-      const text = await extractPdfText(file);
+      document.getElementById('label4').innerText = file.name;
+      document.getElementById('hwpx-summary').innerText = '변환 패키징 중...';
+      const text = await extractTextFromPdf(file);
       const zip = new JSZip();
       zip.file('mimetype', 'application/hwp+zip');
 
-      let sectionXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
-        '<hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section" xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph">\n';
-      
-      const lines = text.split('\n');
-      for (const line of lines) {
+      let secXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section" xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph">\n';
+      for (const line of text.split('\n')) {
         const safe = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        sectionXml += `  <hp:p><hp:run><hp:t>${safe}</hp:t></hp:run></hp:p>\n`;
+        secXml += `  <hp:p><hp:run><hp:t>${safe}</hp:t></hp:run></hp:p>\n`;
       }
-      sectionXml += '</hs:sec>';
-      zip.file('Contents/section0.xml', sectionXml);
+      secXml += '</hs:sec>';
+      zip.file('Contents/section0.xml', secXml);
 
-      hwpxBlob = await zip.generateAsync({type: 'blob'});
-      document.getElementById('hwpx-status').innerText = 'HWPX 파일이 완성되었습니다.';
-      document.getElementById('btn-make-hwpx').disabled = false;
+      hwpxBlob = await zip.generateAsync({ type: 'blob' });
+      document.getElementById('hwpx-summary').innerText = 'HWPX 문서 생성이 완료되었습니다.';
+      document.getElementById('btn-hwpx-down').disabled = false;
     });
 
-    document.getElementById('btn-make-hwpx').addEventListener('click', () => {
+    document.getElementById('btn-hwpx-down').addEventListener('click', () => {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(hwpxBlob);
       a.download = 'converted.hwpx';
