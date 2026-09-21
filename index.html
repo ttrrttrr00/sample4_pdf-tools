@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>문서 통합 유틸리티</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <style>
+    body { font-family: sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; line-height: 1.6; }
+    .tab { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #ddd; }
+    .tab button { padding: 10px 15px; border: none; background: none; font-size: 16px; cursor: pointer; }
+    .tab button.active { font-weight: bold; border-bottom: 3px solid #0066cc; color: #0066cc; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .upload-box { border: 2px dashed #bbb; padding: 30px; text-align: center; margin: 15px 0; border-radius: 8px; }
+    .stat-box { display: flex; gap: 20px; margin-top: 15px; }
+    .stat-item { background: #f4f4f4; padding: 15px; border-radius: 6px; flex: 1; text-align: center; }
+    textarea { width: 100%; height: 200px; margin-top: 15px; box-sizing: border-box; }
+    button.btn { background: #0066cc; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 15px; margin-top: 10px; }
+    button.btn:disabled { background: #aaa; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <h2>📄 문서 통합 처리 도구 (GitHub Pages용)</h2>
+  <div class="tab">
+    <button class="active" onclick="openTab(0)">1. 단어/특수문자</button>
+    <button onclick="openTab(1)">2. 이미지 추출 (JPG)</button>
+    <button onclick="openTab(2)">3. 텍스트 추출 (TXT)</button>
+    <button onclick="openTab(3)">4. HWPX 변환</button>
+  </div>
+
+  <!-- Tab 1 -->
+  <div class="panel active">
+    <div class="upload-box">
+      <input type="file" id="file1" accept=".pdf,.txt">
+    </div>
+    <div class="stat-box">
+      <div class="stat-item">단어 수<h3 id="word-count">0</h3></div>
+      <div class="stat-item">특수문자 수<h3 id="char-count">0</h3></div>
+      <div class="stat-item">공백제외 글자수<h3 id="text-count">0</h3></div>
+    </div>
+  </div>
+
+  <!-- Tab 2 -->
+  <div class="panel">
+    <div class="upload-box">
+      <input type="file" id="file2" accept=".pdf">
+    </div>
+    <button class="btn" id="btn-extract-img" disabled>이미지 ZIP 다운로드</button>
+    <p id="img-status"></p>
+  </div>
+
+  <!-- Tab 3 -->
+  <div class="panel">
+    <div class="upload-box">
+      <input type="file" id="file3" accept=".pdf">
+    </div>
+    <button class="btn" id="btn-download-txt" disabled>텍스트(.txt) 다운로드</button>
+    <textarea id="preview-txt" readonly placeholder="추출된 텍스트가 여기에 표시됩니다."></textarea>
+  </div>
+
+  <!-- Tab 4 -->
+  <div class="panel">
+    <div class="upload-box">
+      <input type="file" id="file4" accept=".pdf">
+    </div>
+    <button class="btn" id="btn-make-hwpx" disabled>.hwpx 다운로드</button>
+    <p id="hwpx-status"></p>
+  </div>
+
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    function openTab(idx) {
+      document.querySelectorAll('.tab button').forEach((b, i) => b.classList.toggle('active', i === idx));
+      document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i === idx));
+    }
+
+    async function extractPdfText(file) {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+      let fullText = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map(item => item.str).join(' ');
+        fullText += `=== [페이지 ${i}] ===\n` + pageText + '\n\n';
+      }
+      return fullText;
+    }
+
+    // 1. 단어/특수문자 카운트
+    document.getElementById('file1').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      let text = '';
+      if (file.name.endsWith('.pdf')) {
+        text = await extractPdfText(file);
+      } else {
+        text = await file.text();
+      }
+      const words = text.trim() ? text.trim().split(/\s+/).length : 0;
+      const specials = (text.match(/[^\w\s]/g) || []).length;
+      const noSpaces = text.replace(/\s+/g, '').length;
+      document.getElementById('word-count').innerText = words.toLocaleString();
+      document.getElementById('char-count').innerText = specials.toLocaleString();
+      document.getElementById('text-count').innerText = noSpaces.toLocaleString();
+    });
+
+    // 2. 이미지 추출 (JPG -> ZIP)
+    let pdfImagesZip = null;
+    document.getElementById('file2').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      document.getElementById('img-status').innerText = '이미지 추출 중...';
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+      const zip = new JSZip();
+      let count = 0;
+
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const ops = await page.getOperatorList();
+        for (let j = 0; j < ops.fnArray.length; j++) {
+          if (ops.fnArray[j] === pdfjsLib.OPS.paintImageXObject) {
+            const imgName = ops.argsArray[j][0];
+            try {
+              const imgObj = await page.objs.get(imgName);
+              const canvas = document.createElement('canvas');
+              canvas.width = imgObj.width;
+              canvas.height = imgObj.height;
+              const ctx = canvas.getContext('2d');
+              const imgData = ctx.createImageData(imgObj.width, imgObj.height);
+              if (imgObj.data.length === imgObj.width * imgObj.height * 3) {
+                let s = 0, d = 0;
+                while (s < imgObj.data.length) {
+                  imgData.data[d++] = imgObj.data[s++];
+                  imgData.data[d++] = imgObj.data[s++];
+                  imgData.data[d++] = imgObj.data[s++];
+                  imgData.data[d++] = 255;
+                }
+              } else {
+                imgData.data.set(imgObj.data);
+              }
+              ctx.putImageData(imgData, 0, 0);
+              const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg'));
+              count++;
+              zip.file(`page_${i}_img_${count}.jpg`, blob);
+            } catch(err) {}
+          }
+        }
+      }
+      if (count > 0) {
+        pdfImagesZip = zip;
+        document.getElementById('img-status').innerText = `총 ${count}개의 이미지를 찾았습니다.`;
+        document.getElementById('btn-extract-img').disabled = false;
+      } else {
+        document.getElementById('img-status').innerText = '추출할 래스터 이미지가 없습니다.';
+      }
+    });
+
+    document.getElementById('btn-extract-img').addEventListener('click', async () => {
+      const content = await pdfImagesZip.generateAsync({type:'blob'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(content);
+      a.download = 'extracted_images.zip';
+      a.click();
+    });
+
+    // 3. 텍스트 추출 (.txt)
+    let extractedText = '';
+    document.getElementById('file3').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      extractedText = await extractPdfText(file);
+      document.getElementById('preview-txt').value = extractedText;
+      document.getElementById('btn-download-txt').disabled = false;
+    });
+
+    document.getElementById('btn-download-txt').addEventListener('click', () => {
+      const blob = new Blob([extractedText], {type: 'text/plain;charset=utf-8'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'extracted_text.txt';
+      a.click();
+    });
+
+    // 4. HWPX 문서 패키징
+    let hwpxBlob = null;
+    document.getElementById('file4').addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      document.getElementById('hwpx-status').innerText = 'HWPX 변환 중...';
+      const text = await extractPdfText(file);
+      const zip = new JSZip();
+      zip.file('mimetype', 'application/hwp+zip');
+
+      let sectionXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+        '<hs:sec xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section" xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph">\n';
+      
+      const lines = text.split('\n');
+      for (const line of lines) {
+        const safe = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        sectionXml += `  <hp:p><hp:run><hp:t>${safe}</hp:t></hp:run></hp:p>\n`;
+      }
+      sectionXml += '</hs:sec>';
+      zip.file('Contents/section0.xml', sectionXml);
+
+      hwpxBlob = await zip.generateAsync({type: 'blob'});
+      document.getElementById('hwpx-status').innerText = 'HWPX 파일이 완성되었습니다.';
+      document.getElementById('btn-make-hwpx').disabled = false;
+    });
+
+    document.getElementById('btn-make-hwpx').addEventListener('click', () => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(hwpxBlob);
+      a.download = 'converted.hwpx';
+      a.click();
+    });
+  </script>
+</body>
+</html>
